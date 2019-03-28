@@ -4,7 +4,8 @@
 
 
 char buf[1024];
-int count, duplicate, insensitive; 
+int count, duplicate, insensitive, capacity; 
+char *dynamicbuf;
 
 int 
 checkcaseinsensitive(char *buf, int pos1, int pos2)
@@ -61,16 +62,35 @@ printsegment(char *buf, int start, int end)
 }
 
 void
+reallocate(int newcapacity)
+{
+  printf(1, "Reallocating\n"); 
+  printf(1, dynamicbuf);  
+  printf(1, "%c",'\n'); 
+  char *newbuf; 
+  newbuf = (char*)malloc(newcapacity * sizeof(char)); 
+  strcpy(newbuf, dynamicbuf);  
+  free(dynamicbuf); 
+  dynamicbuf = newbuf; 
+  capacity = newcapacity; 
+}
+
+void
 uniq(int fd, char *name)
 {
   int i, n, c, previsdup;
   int startpos1, endpos1, startpos2, endpos2, len;
   startpos1 = endpos1 = startpos2 = endpos2 = len = c = previsdup = 0; 
 
-  while((n = read(fd, buf, sizeof(buf))) > 0){
+  while((n = read(fd, dynamicbuf, sizeof(dynamicbuf))) > 0){
+    while(n> 0 && n==capacity && dynamicbuf[n-1]!='\n'){
+      reallocate(capacity*2); 
+      n = read(fd, dynamicbuf, sizeof(dynamicbuf)); 
+    }
+
     startpos1 = 0;
     for(i=0; i<n; i++){
-      if(buf[i] == '\n')
+      if(dynamicbuf[i] == '\n')
       {
         if(endpos1 == 0)
         {
@@ -79,12 +99,12 @@ uniq(int fd, char *name)
           
           //print line1
           if(count != 1 && duplicate != 1)
-            printsegment(buf, startpos1, endpos1);
+            printsegment(dynamicbuf, startpos1, endpos1);
           else if(count == 1){
             c = 1;
             if((i+1)==n){
               printf(1, "%d ", c); 
-              printsegment(buf, startpos1, endpos1);
+              printsegment(dynamicbuf, startpos1, endpos1);
               c = 1;
             }  
           }
@@ -92,7 +112,7 @@ uniq(int fd, char *name)
         else if(endpos2 == 0)
         {
           endpos2 = i -1;
-          if (checkmatch(buf, startpos1, endpos1, startpos2, endpos2) == 1)
+          if (checkmatch(dynamicbuf, startpos1, endpos1, startpos2, endpos2) == 1)
           {
              startpos2 = endpos2 + 2; 
              endpos2 = 0;
@@ -102,7 +122,7 @@ uniq(int fd, char *name)
                c += 1; 
                if((i+1) == n){
                  printf(1, "%d ", c); 
-                 printsegment(buf, startpos1, endpos1);
+                 printsegment(dynamicbuf, startpos1, endpos1);
                  c = 1;
                }  
              }
@@ -111,7 +131,7 @@ uniq(int fd, char *name)
              if(duplicate == 1){
                previsdup = 1;
                if((i+1) == n){
-                 printsegment(buf, startpos1, endpos1);
+                 printsegment(dynamicbuf, startpos1, endpos1);
                }
              } 
              
@@ -122,22 +142,22 @@ uniq(int fd, char *name)
              if(count == 1){
                if((i+1) == n){
                  printf(1, "%d ", c); 
-                 printsegment(buf, startpos2, endpos2);
+                 printsegment(dynamicbuf, startpos2, endpos2);
                  c = 1; 
                }
                printf(1, "%d ", c); 
-               printsegment(buf, startpos1, endpos1);
+               printsegment(dynamicbuf, startpos1, endpos1);
                c = 1;  
              } 
              else if(duplicate == 1){
                if(previsdup == 1){
-                printsegment(buf, startpos1, endpos1);
+                printsegment(dynamicbuf, startpos1, endpos1);
                 previsdup = 0;  
                }
              }
              else { 
                len = endpos2 - startpos2;
-               printsegment(buf, startpos2, endpos2); 
+               printsegment(dynamicbuf, startpos2, endpos2); 
              }
 
              startpos1 = startpos2; 
@@ -160,6 +180,11 @@ main(int argc, char *argv[])
 {
   int fd, i;
   count = duplicate = insensitive = 0; 
+  
+   
+  capacity = 512; 
+
+  dynamicbuf = (char*)malloc(capacity* sizeof(char)); 
 
   if(argc <= 1){
     uniq(0, "");
